@@ -43,8 +43,12 @@ user_item_matrix = rating_data.pivot_table(index='userId', columns='movieId', va
 # Compute the movie similarities
 movie_similarities = cosine_similarity(user_item_matrix.T)
 
-# Define a function to generate movie recommendations
-def get_movie_recommendations(genres, top_n=10, movie_data = movie_data):
+# Load model
+path_model = './model/'
+model_keras = tf.keras.models.load_model(path_model)
+
+# A new user has just signed in
+def get_movie_recommendations_new_user(genres, top_n=10, movie_data = movie_data):
     # Split the genres string into a list of genres
     genres_list = genres.split(',')
     
@@ -93,7 +97,46 @@ def get_movie_recommendations(genres, top_n=10, movie_data = movie_data):
     # return json.loads(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_json(orient='records'))
     return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_dict('records'),indent=4)
 
+# User has ratings before
+def get_movie_recommendations_user_has_rating(user_id, top_n = 10):
+  # Compute the average rating for each movie
+  movie_ratings = rating_data.groupby('movieId')['rating'].mean().to_frame()
+
+  # Handle mean ratings with two column: movieId and mean_rating
+  ratings_mean = movie_ratings.reset_index()
+  ratings_mean = movie_ratings.reset_index().rename(columns={'rating': 'mean_rating'})
+
+  # Recommend movie
+  movies_watched_by_user = rating_df[rating_df.userId == user_id]
+  movies_not_watched = movie_df[
+      ~movie_df["movieId"].isin(movies_watched_by_user.movieId.values)
+  ]["movieId"]
+  movies_not_watched = list(
+      set(movies_not_watched).intersection(set(movie2movie_encoded.keys()))
+  )
+
+  movies_not_watched = [[movie2movie_encoded.get(x)] for x in movies_not_watched]
+  user_encoder = user2user_encoded.get(user_id)
+  user_movie_array = np.hstack(
+      ([[user_encoder]] * len(movies_not_watched), movies_not_watched)
+  )
+
+  ratings = model_keras.predict(user_movie_array).flatten()
+
+  top_ratings_indices = ratings.argsort()[-top_n:][::-1]
+  recommended_movie_ids = [
+      movie_encoded2movie.get(movies_not_watched[x][0]) for x in top_ratings_indices
+  ]
+  recommended_movies = movie_df[movie_df["movieId"].isin(recommended_movie_ids)]
+  recommended_movies = pd.merge(recommended_movies, ratings_mean[['movieId', 'mean_rating']], on='movieId')
+
+  # Format the mean_rating column
+  recommended_movies['mean_rating'] = recommended_movies['mean_rating'].apply(lambda x: f"{x:.1f}")
+
+  # return recommended_movies[['movieId', 'title', 'genres', 'mean_rating', 'weighted_rating', 'similarity_score']]
+  return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_dict('records'),indent=4)
+
 if __name__ == "__main__":
-    genres = 'Action,Thriller'
-    movie_recommendation_json = get_movie_recommendations(genres)
+    genres = '26'
+    movie_recommendation_json = get_movie_recommendations_user_has_rating(genres)
     print(movie_recommendation_json)
