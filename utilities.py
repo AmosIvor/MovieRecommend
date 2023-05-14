@@ -9,6 +9,9 @@ rating_df = pd.read_csv('./dataset/ratings.csv')
 # Read file movies.csv
 movie_df = pd.read_csv("./dataset/movies.csv")
 
+# Read file movie_image.csv
+image_df = pd.read_csv("./dataset/movie_image.csv")
+
 # Prepare dataset
 user_ids = rating_df["userId"].unique().tolist()
 user2user_encoded = {x: i for i, x in enumerate(user_ids)}
@@ -89,13 +92,14 @@ def get_movie_recommendations_new_user(genres, top_n=10, movie_data = movie_data
     recommended_movies = movie_data.head(top_n)
     recommended_movies = pd.merge(recommended_movies, movie_df[['movieId', 'genres']], on='movieId')
     recommended_movies = pd.merge(recommended_movies, ratings_mean[['movieId', 'mean_rating']], on='movieId')
+    recommended_movies = pd.merge(recommended_movies, image_df[['movieId', 'image']], on='movieId')
 
     # Format the mean_rating column
     recommended_movies['mean_rating'] = recommended_movies['mean_rating'].apply(lambda x: f"{x:.1f}")
 
     # return recommended_movies[['movieId', 'title', 'genres', 'mean_rating', 'weighted_rating', 'similarity_score']]
     # return json.loads(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_json(orient='records'))
-    return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_dict('records'),indent=4)
+    return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating', 'image']].to_dict('records'),indent=4)
 
 # User has ratings before
 def get_movie_recommendations_user_has_rating(user_id, top_n = 10):
@@ -129,12 +133,13 @@ def get_movie_recommendations_user_has_rating(user_id, top_n = 10):
   ]
   recommended_movies = movie_df[movie_df["movieId"].isin(recommended_movie_ids)]
   recommended_movies = pd.merge(recommended_movies, ratings_mean[['movieId', 'mean_rating']], on='movieId')
+  recommended_movies = pd.merge(recommended_movies, image_df[['movieId', 'image']], on='movieId')
 
   # Format the mean_rating column
   recommended_movies['mean_rating'] = recommended_movies['mean_rating'].apply(lambda x: f"{x:.1f}")
 
   # return recommended_movies[['movieId', 'title', 'genres', 'mean_rating', 'weighted_rating', 'similarity_score']]
-  return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating']].to_dict('records'),indent=4)
+  return json.dumps(recommended_movies[['movieId', 'title', 'genres', 'mean_rating', 'image']].to_dict('records'),indent=4)
 
 if __name__ == "__main__":
     genres = '26'
